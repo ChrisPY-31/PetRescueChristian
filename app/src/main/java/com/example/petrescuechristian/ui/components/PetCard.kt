@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.petrescuechristian.model.Pet
+import com.example.petrescuechristian.domain.model.Pet
 
 /**
  * Tarjeta de mascota. [showSize] agrega el tamaño a la segunda línea de detalle

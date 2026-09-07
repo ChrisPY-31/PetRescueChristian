@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -31,17 +32,18 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.petrescuechristian.data.PetData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.petrescuechristian.data.SpeciesFilter
+import com.example.petrescuechristian.di.AppContainer
+import com.example.petrescuechristian.di.ViewModelFactory
 import com.example.petrescuechristian.ui.components.CategoryChip
 import com.example.petrescuechristian.ui.components.PetCard
+import com.example.petrescuechristian.ui.viewmodel.CatalogViewModel
 
 private val sizeOptions = listOf("Pequeño", "Mediano", "Grande")
 
@@ -49,27 +51,13 @@ private val sizeOptions = listOf("Pequeño", "Mediano", "Grande")
 fun CatalogScreen(
     initialCategory: String?,
     onPetClick: (Int) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: CatalogViewModel = viewModel(
+        factory = ViewModelFactory { CatalogViewModel(AppContainer.petRepository, initialCategory) }
+    )
 ) {
-    var searchQuery by remember { mutableStateOf("") }
-    var selectedSpecies by remember {
-        mutableStateOf(
-            initialCategory
-                ?.let { name -> runCatching { SpeciesFilter.valueOf(name) }.getOrNull() }
-                ?: SpeciesFilter.ALL
-        )
-    }
-    var selectedSizes by remember { mutableStateOf(setOf<String>()) }
-
-    val filteredPets = PetData.pets.filter { pet ->
-        val matchesQuery = searchQuery.isBlank() ||
-            pet.name.contains(searchQuery, ignoreCase = true) ||
-            pet.breed.contains(searchQuery, ignoreCase = true)
-        val matchesSpecies = selectedSpecies.matches(pet)
-        val matchesSize = selectedSizes.isEmpty() || pet.size in selectedSizes
-
-        matchesQuery && matchesSpecies && matchesSize
-    }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val filteredPets = uiState.filteredPets
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -89,13 +77,13 @@ fun CatalogScreen(
         }
 
         OutlinedTextField(
-            value = searchQuery,
-            onValueChange = { searchQuery = it },
+            value = uiState.searchQuery,
+            onValueChange = viewModel::onSearchChange,
             placeholder = { Text("Buscar por nombre o raza...") },
             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
             trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    IconButton(onClick = { searchQuery = "" }) {
+                if (uiState.searchQuery.isNotEmpty()) {
+                    IconButton(onClick = { viewModel.onSearchChange("") }) {
                         Icon(Icons.Filled.Close, contentDescription = "Limpiar búsqueda")
                     }
                 }
@@ -124,8 +112,8 @@ fun CatalogScreen(
                 CategoryChip(
                     label = species.label,
                     emoji = species.emoji,
-                    selected = species == selectedSpecies,
-                    onClick = { selectedSpecies = species }
+                    selected = species == uiState.selectedSpecies,
+                    onClick = { viewModel.onSpeciesChange(species) }
                 )
             }
         }
@@ -146,12 +134,10 @@ fun CatalogScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             sizeOptions.forEach { size ->
-                val isSelected = size in selectedSizes
+                val isSelected = size in uiState.selectedSizes
                 FilterChip(
                     selected = isSelected,
-                    onClick = {
-                        selectedSizes = if (isSelected) selectedSizes - size else selectedSizes + size
-                    },
+                    onClick = { viewModel.onSizeToggle(size) },
                     label = { Text(size) },
                     leadingIcon = if (isSelected) {
                         {
@@ -177,7 +163,20 @@ fun CatalogScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        if (filteredPets.isEmpty()) {
+        if (uiState.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (uiState.error != null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "No se pudo cargar el catálogo: ${uiState.error}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            }
+        } else if (filteredPets.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
                     text = "No se encontraron mascotas con esos criterios",

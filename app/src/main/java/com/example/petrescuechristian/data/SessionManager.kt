@@ -3,7 +3,7 @@ package com.example.petrescuechristian.data
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.example.petrescuechristian.model.User
+import com.example.petrescuechristian.domain.model.User
 
 /**
  * Mantiene la sesión del usuario actual en memoria (sin persistencia ni backend).

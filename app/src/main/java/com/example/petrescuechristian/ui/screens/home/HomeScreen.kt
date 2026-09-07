@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -38,13 +40,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.petrescuechristian.data.PetData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.petrescuechristian.data.SessionManager
 import com.example.petrescuechristian.data.SpeciesFilter
+import com.example.petrescuechristian.di.AppContainer
+import com.example.petrescuechristian.di.ViewModelFactory
 import com.example.petrescuechristian.ui.components.CategoryChip
 import com.example.petrescuechristian.ui.components.PetCard
 import com.example.petrescuechristian.ui.components.QuickAccessCard
 import com.example.petrescuechristian.ui.theme.PetRescueChristianTheme
+import com.example.petrescuechristian.ui.viewmodel.HomeViewModel
 
 @Composable
 fun HomeScreen(
@@ -55,10 +61,14 @@ fun HomeScreen(
     onNearbyClick: () -> Unit,
     onFavoritesClick: () -> Unit,
     onMyReportsClick: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    viewModel: HomeViewModel = viewModel(
+        factory = ViewModelFactory { HomeViewModel(AppContainer.petRepository) }
+    )
 ) {
     val user = SessionManager.currentUser
-    val availablePets = PetData.pets.filter { it.available }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val availablePets = uiState.availablePets
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -204,7 +214,23 @@ fun HomeScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
-                if (availablePets.isEmpty()) {
+                if (uiState.isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                } else if (uiState.error != null) {
+                    Text(
+                        text = "No se pudieron cargar las mascotas: ${uiState.error}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                } else if (availablePets.isEmpty()) {
                     Text(
                         text = "No hay mascotas disponibles por el momento",
                         style = MaterialTheme.typography.bodyMedium,

@@ -3,7 +3,7 @@ package com.example.petrescuechristian.ui.components
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
-import com.example.petrescuechristian.model.Pet
+import com.example.petrescuechristian.domain.model.Pet
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition

@@ -40,6 +40,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,16 +55,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
-import com.example.petrescuechristian.data.ReportRepository
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.petrescuechristian.di.AppContainer
+import com.example.petrescuechristian.di.ViewModelFactory
 import com.example.petrescuechristian.location.LocationStatus
 import com.example.petrescuechristian.location.rememberLocationState
-import com.example.petrescuechristian.model.PetReport
+import com.example.petrescuechristian.ui.viewmodel.ReportViewModel
 import com.example.petrescuechristian.util.createPhotoFile
 import com.example.petrescuechristian.util.decodeSampledBitmap
 import com.example.petrescuechristian.util.getUriForFile
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 
 private val animalTypes = listOf("Perro", "Gato", "Otro")
@@ -71,19 +73,18 @@ private val animalTypes = listOf("Perro", "Gato", "Otro")
 @Composable
 fun ReportScreen(
     onReportCreated: (Int) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: ReportViewModel = viewModel(
+        factory = ViewModelFactory { ReportViewModel(AppContainer.petReportRepository) }
+    )
 ) {
     val context = LocalContext.current
     val (locationState, retryLocation) = rememberLocationState()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    var animalType by remember { mutableStateOf<String?>(null) }
-    var description by remember { mutableStateOf("") }
-    var photoPath by remember { mutableStateOf<String?>(null) }
-
-    var animalTypeError by remember { mutableStateOf<String?>(null) }
-    var descriptionError by remember { mutableStateOf<String?>(null) }
-    var photoError by remember { mutableStateOf<String?>(null) }
-    var locationSubmitError by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(uiState.createdReportId) {
+        uiState.createdReportId?.let { onReportCreated(it) }
+    }
 
     var pendingPhotoFile by remember { mutableStateOf<File?>(null) }
     var reviewPhotoPath by remember { mutableStateOf<String?>(null) }
@@ -112,7 +113,7 @@ fun ReportScreen(
         if (granted) {
             launchCamera()
         } else {
-            photoError = "Se requiere permiso de cámara para tomar la foto"
+            viewModel.onPhotoError("Se requiere permiso de cámara para tomar la foto")
         }
     }
 
@@ -129,41 +130,12 @@ fun ReportScreen(
         }
     }
 
-    fun validateAndSubmit() {
-        animalTypeError = if (animalType == null) "Selecciona el tipo de animal" else null
-        descriptionError = if (description.isBlank()) "Describe a la mascota encontrada" else null
-        photoError = if (photoPath == null) "Toma una fotografía de la mascota" else null
-        locationSubmitError = if (locationState.latitude == null || locationState.longitude == null) {
-            "No se pudo obtener tu ubicación. Reintenta antes de generar el reporte."
-        } else {
-            null
-        }
-
-        if (animalTypeError != null || descriptionError != null || photoError != null || locationSubmitError != null) {
-            return
-        }
-
-        val report = PetReport(
-            id = ReportRepository.generateId(),
-            species = animalType!!,
-            description = description.trim(),
-            latitude = locationState.latitude!!,
-            longitude = locationState.longitude!!,
-            imageUri = photoPath,
-            date = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date()),
-            status = "Pendiente de revisión"
-        )
-        ReportRepository.addReport(report)
-        onReportCreated(report.id)
-    }
-
     reviewPhotoPath?.let { path ->
         PhotoReviewDialog(
             photoPath = path,
             onAccept = {
                 // Paso 6: se acepta y se asocia la imagen (ya almacenada localmente) al reporte.
-                photoPath = path
-                photoError = null
+                viewModel.onPhotoChange(path)
                 reviewPhotoPath = null
             },
             onRetake = {
@@ -212,27 +184,21 @@ fun ReportScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .selectable(
-                                selected = animalType == type,
-                                onClick = {
-                                    animalType = type
-                                    animalTypeError = null
-                                }
+                                selected = uiState.animalType == type,
+                                onClick = { viewModel.onAnimalTypeChange(type) }
                             )
                             .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         RadioButton(
-                            selected = animalType == type,
-                            onClick = {
-                                animalType = type
-                                animalTypeError = null
-                            }
+                            selected = uiState.animalType == type,
+                            onClick = { viewModel.onAnimalTypeChange(type) }
                         )
                         Text(text = type)
                     }
                 }
             }
-            animalTypeError?.let {
+            uiState.animalTypeError?.let {
                 Text(
                     text = it,
                     color = MaterialTheme.colorScheme.error,
@@ -249,14 +215,11 @@ fun ReportScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
-                value = description,
-                onValueChange = {
-                    description = it
-                    descriptionError = null
-                },
+                value = uiState.description,
+                onValueChange = viewModel::onDescriptionChange,
                 placeholder = { Text("Color, tamaño, lugar exacto, estado de la mascota...") },
-                isError = descriptionError != null,
-                supportingText = { descriptionError?.let { Text(it) } },
+                isError = uiState.descriptionError != null,
+                supportingText = { uiState.descriptionError?.let { Text(it) } },
                 minLines = 3,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -270,8 +233,8 @@ fun ReportScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
 
-            val previewBitmap = remember(photoPath) {
-                photoPath?.let { decodeSampledBitmap(it, 900, 900) }
+            val previewBitmap = remember(uiState.photoPath) {
+                uiState.photoPath?.let { decodeSampledBitmap(it, 900, 900) }
             }
 
             Box(
@@ -316,7 +279,7 @@ fun ReportScreen(
                 }
             }
 
-            photoError?.let {
+            uiState.photoError?.let {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = it,
@@ -388,7 +351,7 @@ fun ReportScreen(
                 }
             }
 
-            locationSubmitError?.let {
+            uiState.locationError?.let {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = it,
@@ -400,15 +363,20 @@ fun ReportScreen(
             Spacer(modifier = Modifier.height(28.dp))
 
             Button(
-                onClick = { validateAndSubmit() },
+                onClick = { viewModel.submit(locationState.latitude, locationState.longitude) },
+                enabled = !uiState.isSubmitting,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
-                Text(
-                    text = "GENERAR REPORTE",
-                    fontWeight = FontWeight.Bold
-                )
+                if (uiState.isSubmitting) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Text(
+                        text = "GENERAR REPORTE",
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(28.dp))

@@ -22,12 +22,14 @@ import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,16 +39,24 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.petrescuechristian.data.ReportRepository
-import com.example.petrescuechristian.model.PetReport
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.petrescuechristian.di.AppContainer
+import com.example.petrescuechristian.di.ViewModelFactory
+import com.example.petrescuechristian.domain.model.PetReport
+import com.example.petrescuechristian.ui.viewmodel.MyReportsViewModel
 import com.example.petrescuechristian.util.decodeSampledBitmap
 
 @Composable
 fun MyReportsScreen(
     onReportClick: (Int) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: MyReportsViewModel = viewModel(
+        factory = ViewModelFactory { MyReportsViewModel(AppContainer.petReportRepository) }
+    )
 ) {
-    val reports = ReportRepository.reports
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val reports = uiState.reports
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -65,7 +75,11 @@ fun MyReportsScreen(
             )
         }
 
-        if (reports.isEmpty()) {
+        if (uiState.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (reports.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(

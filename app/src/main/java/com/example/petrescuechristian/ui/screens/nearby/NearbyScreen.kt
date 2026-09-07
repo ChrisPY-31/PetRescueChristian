@@ -33,20 +33,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.petrescuechristian.data.PetData
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.petrescuechristian.di.AppContainer
+import com.example.petrescuechristian.di.ViewModelFactory
 import com.example.petrescuechristian.location.LocationStatus
 import com.example.petrescuechristian.location.rememberLocationState
-import com.example.petrescuechristian.model.Pet
+import com.example.petrescuechristian.domain.model.Pet
 import com.example.petrescuechristian.ui.components.DetailRow
 import com.example.petrescuechristian.ui.components.MiniMap
 import com.example.petrescuechristian.ui.components.colorForSpecies
 import com.example.petrescuechristian.ui.components.emojiForSpecies
+import com.example.petrescuechristian.ui.viewmodel.NearbyViewModel
 import com.example.petrescuechristian.util.distanceInKm
 import com.example.petrescuechristian.util.formatDistance
 import java.text.SimpleDateFormat
@@ -57,10 +62,14 @@ import kotlin.math.roundToInt
 @Composable
 fun NearbyScreen(
     onPetClick: (Int) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: NearbyViewModel = viewModel(
+        factory = ViewModelFactory { NearbyViewModel(AppContainer.petRepository) }
+    )
 ) {
     val (locationState, retryLocation) = rememberLocationState()
-    val availablePets = PetData.pets.filter { it.available }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val availablePets = uiState.availablePets
 
     val nearbyPets: List<Pair<Pet, Double>> = run {
         val lat = locationState.latitude

@@ -20,7 +20,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.petrescuechristian"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 37
         versionCode = 1
         versionName = "1.0"
@@ -28,6 +28,13 @@ android {
         // La API key se guarda en local.properties (no se sube a control de versiones)
         // y se inyecta aquí en vez de dejarla escrita en el manifest.
         manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY", "")
+
+        // Credenciales de PostgreSQL: mismo patrón, vienen de local.properties (no versionado).
+        buildConfigField("String", "DB_HOST", "\"${localProperties.getProperty("DB_HOST", "")}\"")
+        buildConfigField("int", "DB_PORT", localProperties.getProperty("DB_PORT", "5432"))
+        buildConfigField("String", "DB_NAME", "\"${localProperties.getProperty("DB_NAME", "")}\"")
+        buildConfigField("String", "DB_USER", "\"${localProperties.getProperty("DB_USER", "")}\"")
+        buildConfigField("String", "DB_PASSWORD", "\"${localProperties.getProperty("DB_PASSWORD", "")}\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -45,6 +52,18 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/DEPENDENCIES"
+            )
+        }
     }
 }
 
@@ -58,9 +77,13 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.play.services.maps)
     implementation(libs.maps.compose)
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.postgresql)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

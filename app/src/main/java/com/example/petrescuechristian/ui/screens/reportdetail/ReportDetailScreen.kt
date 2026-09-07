@@ -20,12 +20,14 @@ import androidx.compose.material.icons.filled.BrokenImage
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,18 +36,34 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.petrescuechristian.data.ReportRepository
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.petrescuechristian.di.AppContainer
+import com.example.petrescuechristian.di.ViewModelFactory
 import com.example.petrescuechristian.ui.components.DetailRow
 import com.example.petrescuechristian.ui.components.MiniMap
+import com.example.petrescuechristian.ui.viewmodel.ReportDetailViewModel
 import com.example.petrescuechristian.util.decodeSampledBitmap
 import java.util.Locale
 
 @Composable
 fun ReportDetailScreen(
     reportId: Int,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: ReportDetailViewModel = viewModel(
+        factory = ViewModelFactory { ReportDetailViewModel(AppContainer.petReportRepository, reportId) }
+    )
 ) {
-    val report = ReportRepository.findById(reportId)
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    if (uiState.isLoading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    val report = uiState.report
 
     if (report == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

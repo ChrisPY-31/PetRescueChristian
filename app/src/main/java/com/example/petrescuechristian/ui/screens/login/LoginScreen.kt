@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,9 +31,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -43,37 +42,26 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.petrescuechristian.data.AuthRepository
-import com.example.petrescuechristian.data.SessionManager
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.petrescuechristian.di.AppContainer
+import com.example.petrescuechristian.di.ViewModelFactory
 import com.example.petrescuechristian.ui.theme.PetRescueChristianTheme
+import com.example.petrescuechristian.ui.viewmodel.LoginViewModel
 
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit) {
-    var identifier by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) }
+fun LoginScreen(
+    onLoginSuccess: () -> Unit,
+    viewModel: LoginViewModel = viewModel(
+        factory = ViewModelFactory { LoginViewModel(AppContainer.authRepository) }
+    )
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    var identifierError by remember { mutableStateOf<String?>(null) }
-    var passwordError by remember { mutableStateOf<String?>(null) }
-    var loginError by remember { mutableStateOf<String?>(null) }
-
-    fun validateAndLogin() {
-        identifierError = if (identifier.isBlank()) "Ingresa tu correo o usuario" else null
-        passwordError = when {
-            password.isBlank() -> "Ingresa tu contraseña"
-            password.length < 6 -> "Debe tener al menos 6 caracteres"
-            else -> null
-        }
-        loginError = null
-
-        if (identifierError == null && passwordError == null) {
-            val user = AuthRepository.login(identifier, password)
-            if (user != null) {
-                SessionManager.login(user)
-                onLoginSuccess()
-            } else {
-                loginError = "Usuario o contraseña incorrectos"
-            }
+    LaunchedEffect(uiState.loginSuccess) {
+        if (uiState.loginSuccess) {
+            viewModel.consumeLoginSuccess()
+            onLoginSuccess()
         }
     }
 
@@ -120,17 +108,13 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             Spacer(modifier = Modifier.height(32.dp))
 
             OutlinedTextField(
-                value = identifier,
-                onValueChange = {
-                    identifier = it
-                    identifierError = null
-                    loginError = null
-                },
+                value = uiState.identifier,
+                onValueChange = viewModel::onIdentifierChange,
                 label = { Text("Correo o usuario") },
                 leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
                 singleLine = true,
-                isError = identifierError != null,
-                supportingText = { identifierError?.let { Text(it) } },
+                isError = uiState.identifierError != null,
+                supportingText = { uiState.identifierError?.let { Text(it) } },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email,
                     imeAction = ImeAction.Next
@@ -141,35 +125,31 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             Spacer(modifier = Modifier.height(12.dp))
 
             OutlinedTextField(
-                value = password,
-                onValueChange = {
-                    password = it
-                    passwordError = null
-                    loginError = null
-                },
+                value = uiState.password,
+                onValueChange = viewModel::onPasswordChange,
                 label = { Text("Contraseña") },
                 leadingIcon = { Icon(Icons.Filled.Lock, contentDescription = null) },
                 trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    IconButton(onClick = viewModel::onTogglePasswordVisibility) {
                         Icon(
-                            imageVector = if (passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                            contentDescription = if (passwordVisible) "Ocultar contraseña" else "Mostrar contraseña"
+                            imageVector = if (uiState.passwordVisible) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                            contentDescription = if (uiState.passwordVisible) "Ocultar contraseña" else "Mostrar contraseña"
                         )
                     }
                 },
-                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                visualTransformation = if (uiState.passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 singleLine = true,
-                isError = passwordError != null,
-                supportingText = { passwordError?.let { Text(it) } },
+                isError = uiState.passwordError != null,
+                supportingText = { uiState.passwordError?.let { Text(it) } },
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Password,
                     imeAction = ImeAction.Done
                 ),
-                keyboardActions = KeyboardActions(onDone = { validateAndLogin() }),
+                keyboardActions = KeyboardActions(onDone = { viewModel.login() }),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            loginError?.let {
+            uiState.loginError?.let {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = it,
@@ -181,12 +161,17 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = { validateAndLogin() },
+                onClick = viewModel::login,
+                enabled = !uiState.isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
             ) {
-                Text("Iniciar sesión")
+                if (uiState.isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Text("Iniciar sesión")
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -204,11 +189,11 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Usuario: ${AuthRepository.TEST_USERNAME}",
+                        text = "Usuario: christian",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        text = "Contraseña: ${AuthRepository.TEST_PASSWORD}",
+                        text = "Contraseña: 12345678",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }

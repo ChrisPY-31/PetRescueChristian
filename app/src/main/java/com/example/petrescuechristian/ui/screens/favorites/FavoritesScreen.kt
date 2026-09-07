@@ -16,25 +16,35 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.petrescuechristian.data.FavoritesManager
-import com.example.petrescuechristian.data.PetData
+import com.example.petrescuechristian.di.AppContainer
+import com.example.petrescuechristian.di.ViewModelFactory
 import com.example.petrescuechristian.ui.components.PetCard
+import com.example.petrescuechristian.ui.viewmodel.FavoritesViewModel
 
 @Composable
 fun FavoritesScreen(
     onPetClick: (Int) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: FavoritesViewModel = viewModel(
+        factory = ViewModelFactory { FavoritesViewModel(AppContainer.petRepository) }
+    )
 ) {
-    val favoritePets = PetData.pets.filter { FavoritesManager.isFavorite(it.id) }
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val favoritePets = uiState.allPets.filter { FavoritesManager.isFavorite(it.id) }
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -53,7 +63,11 @@ fun FavoritesScreen(
             )
         }
 
-        if (favoritePets.isEmpty()) {
+        if (uiState.isLoading) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        } else if (favoritePets.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(

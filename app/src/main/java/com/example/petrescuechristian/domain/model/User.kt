@@ -1,3 +1,3 @@
-package com.example.petrescuechristian.model
+package com.example.petrescuechristian.domain.model
 
 data class User( val id: Int, val name:String, val email:String )

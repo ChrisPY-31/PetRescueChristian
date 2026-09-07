@@ -1,6 +1,6 @@
-package com.example.petrescuechristian.model
+package com.example.petrescuechristian.data.local.entity
 
-data class Pet(
+data class PetEntity(
     val id: Int,
     val name: String,
     val species: String,

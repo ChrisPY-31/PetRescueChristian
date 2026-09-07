@@ -1,6 +1,6 @@
 package com.example.petrescuechristian.data
 
-import com.example.petrescuechristian.model.Pet
+import com.example.petrescuechristian.domain.model.Pet
 
 enum class SpeciesFilter(val label: String, val emoji: String) {
     ALL("Todos", "🐾"),
